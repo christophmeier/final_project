@@ -9,9 +9,5 @@ pytest-cov = "*"
 
 [packages]
 
-csci-utils = {editable = true,git = "https://github.com/csci-e-29/2020sp-csci-utils-christophmeier"}
-
-setuptools_scm = "*"
-
 [requires]
 python_version = "3.7"
