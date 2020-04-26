@@ -6,8 +6,17 @@ verify_ssl = true
 [dev-packages]
 pytest = "*"
 pytest-cov = "*"
+awscli = "*"
 
 [packages]
+numpy = "*"
+cython = "*"
+matplotlib = "*"
+scipy = "*"
+pandas = "*"
+pystan = "*"
+fbprophet = "*"
+tables = "*"
 
 [requires]
 python_version = "3.7"

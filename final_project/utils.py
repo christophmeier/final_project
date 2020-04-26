@@ -9,7 +9,7 @@ import multiprocessing as mp
 
 
 def dec_logger(func):
-    """ Decorator for logging
+    """ Decorator for logging a function start and end
 
     :param func: function to be decorated
     :return: wrapper function
@@ -55,3 +55,44 @@ def dec_validation(func):
             dtf_logger.error("|{}| Exception occured: {}".format(process_id, e))
             return
     return wrapper_validation
+
+
+def configure_logger():
+    """ Creates and configures a logger using Python logging module.
+
+    :return: a customized logger
+    """
+
+    # Disable handlers of root logger
+    logging.getLogger().handlers = []
+
+    # Create a custom logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    # Create handlers
+    c_handler = logging.StreamHandler()
+    f_handler = logging.FileHandler("../summary.log", mode="w")
+    f_handler_error = logging.FileHandler("../summary_error.log", mode="w")
+
+    c_handler.setLevel(logging.INFO)
+    f_handler.setLevel(logging.INFO)
+    f_handler_error.setLevel(logging.ERROR)
+
+    # Create formatters and add it to handlers
+    c_format = logging.Formatter(
+        fmt="[%(asctime)s] %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+    )
+    f_format = logging.Formatter(
+        fmt="[%(asctime)s] %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+    )
+    c_handler.setFormatter(c_format)
+    f_handler.setFormatter(f_format)
+    f_handler_error.setFormatter(f_format)
+
+    # Add handlers to the logger
+    logger.addHandler(c_handler)
+    logger.addHandler(f_handler)
+    logger.addHandler(f_handler_error)
+
+    return logger
