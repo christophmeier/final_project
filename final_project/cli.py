@@ -16,20 +16,20 @@ Why does this file exist, and why not put this in __main__?
 """
 import argparse
 import datetime
-from .data import *
-from .utils import *
+import multiprocessing as mp
 from .process import *
 
-
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", dest="n_days", type=int, default=1095)
+parser.add_argument("-d", dest="n_days", type=int, default=365)
 
 
 def main():
+    #df_test = pd.read_hdf("forecast.h5", "df")
+
     # Get number of days to be forecasted
     # args = parser.parse_args()
     # fcst_days = args.n_days
-    fcst_days = 1095
+    fcst_days = 365
 
     # Create dictionary with respect to configuration data
     dict_config = {'fcst_days': fcst_days}
@@ -45,10 +45,11 @@ def main():
     dict_so_cluster, df_traffic = load_data()
 
     # Start worker processes
-    start_process(df_traffic, dict_so_cluster, dict_config)
+    df_fcst_results = start_process(df_traffic, dict_so_cluster, dict_config)
 
     # Export data
+    export_fcst_results_hdf5(df_fcst_results)
 
     # Measure final time and display overall time
     t_end = datetime.datetime.now()
-    logger.info("Program end\nProgram duration: {}".format(t_end - t_start))
+    logger.info(f"Program end\nProgram duration: {(t_end - t_start)}")

@@ -6,32 +6,28 @@ The module contains the following functions:
 """
 import logging
 import multiprocessing as mp
+import sys
 
 
 def dec_logger(func):
-    """ Decorator for logging a function start and end
+    """ Decorator for logging start and finish of a function
 
     :param func: function to be decorated
     :return: wrapper function
     """
+
     def wrapper_logger(*args, **kwargs):
-        # Get process ID
-        process_id = mp.current_process().name
-        # Get DTF logger
-        dtf_logger = logging.getLogger("dtf_logger")
-        # Logging of function start
-        dtf_logger.info(
-            "|{}| > Start of function '{}'...".format(process_id, func.__name__)
-        )
-        # Call decorated function
+        # Get logger and set level
+        logger = mp.get_logger()
+        logger.setLevel(logging.INFO)
+
+        # Call function with logger at the start and after finish
+        logger.info("> Start of function '{}'...".format(func.__name__))
         output = func(*args, **kwargs)
-        # Logging of function end
-        dtf_logger.info(
-            "|{}| + Function '{}' successfully finished.".format(
-                process_id, func.__name__
-            )
-        )
+        logger.info("+ Function '{}' successfully finished.".format(func.__name__))
+
         return output
+
     return wrapper_logger
 
 
@@ -42,18 +38,21 @@ def dec_validation(func):
     :param func: function to be decorated
     :return: wrapper function
     """
+
     def wrapper_validation(*args, **kwargs):
-        # Get process ID
-        process_id = mp.current_process().name
-        # Get DTF logger
-        dtf_logger = logging.getLogger("dtf_logger")
+        # Get logger and set level
+        logger = mp.get_logger()
+        logger.setLevel(logging.ERROR)
+
         try:
             # Call decorated function
             return func(*args, **kwargs)
+
         except Exception as e:
             # Logging of exception and stop function
-            dtf_logger.error("|{}| Exception occured: {}".format(process_id, e))
+            logger.error("!! Exception occured: {}".format(e))
             return
+
     return wrapper_validation
 
 
@@ -62,37 +61,43 @@ def configure_logger():
 
     :return: a customized logger
     """
-
-    # Disable handlers of root logger
-    logging.getLogger().handlers = []
+    # Disable fbprophet logger
+    logging.getLogger("fbprophet").setLevel(logging.ERROR)
+    logging.getLogger("fbprophet").handlers = []
 
     # Create a custom logger
-    logger = logging.getLogger()
+    # mp.log_to_stderr()
+    logger = mp.get_logger()
     logger.setLevel(logging.INFO)
 
-    # Create handlers
-    c_handler = logging.StreamHandler()
-    f_handler = logging.FileHandler("../summary.log", mode="w")
-    f_handler_error = logging.FileHandler("../summary_error.log", mode="w")
-
+    # Console output
+    c_handler = logging.StreamHandler(sys.stderr)
     c_handler.setLevel(logging.INFO)
-    f_handler.setLevel(logging.INFO)
-    f_handler_error.setLevel(logging.ERROR)
-
-    # Create formatters and add it to handlers
     c_format = logging.Formatter(
-        fmt="[%(asctime)s] %(message)s", datefmt="%d-%b-%y %H:%M:%S"
-    )
-    f_format = logging.Formatter(
-        fmt="[%(asctime)s] %(message)s", datefmt="%d-%b-%y %H:%M:%S"
+        fmt="[%(levelname)s/%(processName)s] %(asctime)s | %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
     )
     c_handler.setFormatter(c_format)
-    f_handler.setFormatter(f_format)
-    f_handler_error.setFormatter(f_format)
-
-    # Add handlers to the logger
     logger.addHandler(c_handler)
+
+    # File output
+    f_handler = logging.FileHandler(
+        f"../logs/summary_[{mp.current_process().name}].log", mode="w"
+    )
+    f_handler.setLevel(logging.INFO)
+    f_format = logging.Formatter(
+        fmt="[%(levelname)s/%(processName)s] %(asctime)s | %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
+    )
+    f_handler.setFormatter(f_format)
     logger.addHandler(f_handler)
+
+    # File output in case of exceptions
+    f_handler_error = logging.FileHandler(
+        f"../logs/summary_error_[{mp.current_process().name}].log", mode="w"
+    )
+    f_handler_error.setLevel(logging.ERROR)
+    f_handler_error.setFormatter(f_format)
     logger.addHandler(f_handler_error)
 
     return logger

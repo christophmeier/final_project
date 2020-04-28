@@ -7,11 +7,12 @@ The module contains the following functions:
 * get_cluster_chunks:
 * mp_run:
 """
+import concurrent.futures
+import multiprocessing as mp
 from functools import partial
-from multiprocessing import Pool
-from .utils import *
 from .preprocessing import *
 from .forecasting import *
+from .data import *
 
 
 MAX_PROCESSES = 32
@@ -28,29 +29,38 @@ def start_process(df_traffic, dict_so_cluster, dict_config):
     :type dict_so_cluster: Dictionary
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
-    :return:
+    :return: the original and forecasted time series for every cluster
+    :rtype pandas DataFrame
     """
-    # Determine number of processes to be initialized
+    # Determine max number of processes to be initialized
     n_processes = get_number_processes()
-    n_processes = 1
+
     # Determine cluster IDs to be forecasted
     cluster_ids = list(set(val for val in dict_so_cluster.values()))
-    cluster_ids = [0]
-    # Split cluster IDs in equal batches which will be assigned to processes
-    cluster_ids_section = get_cluster_chunks(cluster_ids, n_processes)
+    cluster_ids = cluster_ids[:2]
 
-    # Start multiprocessing and generate a pool with n_processes as #workers
-    pool = Pool(processes=n_processes)
+    # Create result DataFrame
+    df_fcst_results = prepare_fcst_df()
 
-    # Create partial function and pass constant parameters to pool workers
+    # Create a partial function to pass multiple arguments
     func = partial(mp_run, df_traffic, dict_so_cluster, dict_config)
 
-    # Map-reduce of pool workers
-    pool.map(func, cluster_ids_section)
+    # Serial implementation
+    # for cluster in cluster_ids:
+    #     fcst_results = mp_run(df_traffic, dict_so_cluster, dict_config, cluster)
+    #
+    #     # Combine all individual forecast results to one DataFrame
+    #     df_fcst_results = df_fcst_results.append(fcst_results)
 
-    # Wait for workers until they are all finished
-    pool.close()
-    pool.join()
+    # Use context manager for ProcessPoolExecutor and iterate over cluster_ids
+    with concurrent.futures.ProcessPoolExecutor(max_workers=n_processes) as executor:
+        fcst_results = executor.map(func, cluster_ids)
+
+        # Combine all individual forecast results to one DataFrame
+        for fcst in fcst_results:
+            df_fcst_results = df_fcst_results.append(fcst)
+
+    return df_fcst_results
 
 
 @dec_validation
@@ -94,8 +104,8 @@ def get_cluster_chunks(cluster_ids, n_processes):
     return cluster_ids_section
 
 
-def mp_run(df_traffic, dict_so_cluster, dict_config, cluster_ids):
-    """ Implementation of a single process / worker for
+def mp_run(df_traffic, dict_so_cluster, dict_config, clu_id):
+    """ Implementation of a single process / worker
 
     :param df_traffic: DataFrame with traffic related data and DateTimeIndex
     :type df_traffic: pandas DataFrame
@@ -103,24 +113,24 @@ def mp_run(df_traffic, dict_so_cluster, dict_config, cluster_ids):
     :type dict_so_cluster: Dictionary
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
-    :param cluster_ids: list of clusters to be processed
-    :type cluster_ids: list of ints
-    :return
-    :rtype
+    :param clu_id: cluster ID to be processed
+    :type clu_id: int
+    :return the original & forecasted time series for the cluster
+    :rtype pandas DataFrame
     """
 
-    # Configure logger for each individual process
+    # Configure logger for each individual process and get process ID
     logger = configure_logger()
 
-    # Get process ID
-    process_id = mp.current_process().name
+    # Run pre-processing
+    df_ts_cluster = preprocess_data(df_traffic, dict_so_cluster, clu_id)
 
-    # Run pre-processing and forecasting for every selected cluster
-    for clu_id in cluster_ids:
-        # Run pre-processing
-        df_ts_cluster = preprocess_data(df_traffic, dict_so_cluster, clu_id)
+    # Run forecasting to get a DataFrame with forecasted time series
+    logger.info(f"> Start forecast cluster ID {clu_id}")
+    df_fcst = forecast(df_ts_cluster, dict_config)
+    logger.info(f"+ End forecast cluster ID: {clu_id}")
 
-        # Run forecasting to get a DataFrame with forecasted time series
-        logger.info("|{}| > Start cluster forecast: {}".format(process_id, clu_id))
-        df_fcst = forecast(df_ts_cluster, dict_config)
-        logger.info("|{}| > End cluster forecast: {}".format(process_id, clu_id))
+    # Add cluster identifier for the time series
+    df_fcst["cluster_id"] = clu_id
+
+    return df_fcst[["ds", "cluster_id", "y", "yhat"]]

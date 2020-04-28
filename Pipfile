@@ -17,6 +17,7 @@ pandas = "*"
 pystan = "*"
 fbprophet = "*"
 tables = "*"
+plotly = "*"
 
 [requires]
 python_version = "3.7"

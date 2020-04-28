@@ -45,7 +45,7 @@ def load_clustering(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError("File {} does not exist".format(filename))
     # Read raw data
-    df_clustering = pd.read_csv(filename, sep=';')
+    df_clustering = pd.read_csv(filename, sep=";")
     # Make dictionary out of site numbers and cluster IDs
     dict_so_cluster = pd.Series(
         df_clustering["cluster"].values, index=df_clustering["so_number"]
@@ -74,3 +74,35 @@ def load_traffic(filename, key="df"):
         raise FileNotFoundError("File {} does not exist".format(filename))
     # Read raw traffic data and return it as DataFrame
     return pd.read_hdf(filename, key)
+
+
+@dec_validation
+@dec_logger
+def export_fcst_results_hdf5(
+    df_fcst_results, filename="../data/fcst_results/forecast.h5"
+):
+    """ Writes the content of a DataFrame containing the forecasting results
+    for each cluster into a HDF5 file
+
+    :param df_fcst_results: DataFrame containing the forecasting results of
+                            each cluster
+    :type df_fcst_results: pandas DataFrame
+    :param filename: name of output file
+    :type filename: str
+    """
+    # Replace NaN values with 0 and export as hdf file
+    df_fcst_results.fillna(0).to_hdf(filename, key="df", mode="w")
+
+
+@dec_validation
+@dec_logger
+def prepare_fcst_df():
+    """ Creates a DataFrame in the format used for export of forecast results
+
+    :return: empty DataFrame with desired forecast format
+    :rtype pandas DataFrame
+    """
+    # Generate DataFrame for Oracle export
+    df_export = pd.DataFrame(columns=["ds", "cluster_id", "y", "yhat"])
+
+    return df_export

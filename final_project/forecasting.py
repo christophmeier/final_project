@@ -51,9 +51,6 @@ def prepare_forecast(df_ts_cluster):
     # Set target variable
     df_ts_prophet["y"] = df_ts_cluster["gb"].iloc[:]
 
-    # Save original input data
-    df_ts_prophet["y_original"] = df_ts_prophet["y"]
-
     # Set dates
     df_ts_prophet.loc[(df_ts_prophet["y"] < 0), "y"] = None
     df_ts_prophet["ds"] = df_ts_cluster.index
@@ -90,6 +87,8 @@ def make_forecast(df_ts_prophet, dict_config):
 
     # Make forecast
     df_fcst_prophet = model_prophet.predict(df_future)
-    model_prophet.plot(df_fcst_prophet)
+
+    # Add original values
+    df_fcst_prophet["y"] = df_ts_prophet["y"]
 
     return df_fcst_prophet
