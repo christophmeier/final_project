@@ -52,10 +52,15 @@ def make_ts(df_traffic, dict_so_cluster, cluster_id):
     :return: a DataFrame with daily data traffic for the cluster
     :rtype pandas DataFrame with DateTimeIndex and one column
     """
-    # Get all sites of cluster
-    so_cluster = [
-        so for so in dict_so_cluster.keys() if dict_so_cluster[so] == cluster_id
-    ]
+
+    # Get list of sites in selected cluster ID
+    if cluster_id >= 0:
+        so_cluster = [
+            so for so in dict_so_cluster.keys() if dict_so_cluster[so] == cluster_id
+        ]
+    # For a negative ID, consider all sites i.e. total Germany
+    else:
+        so_cluster = [so for so in dict_so_cluster.keys()]
 
     # Generate DataFrames related to data traffic of cluster
     df_ts_cluster = df_traffic.loc[df_traffic["so_number"].isin(so_cluster)]
@@ -65,7 +70,7 @@ def make_ts(df_traffic, dict_so_cluster, cluster_id):
 
     # Rename index and aggregate traffic data on cluster level by date / index
     df_ts_cluster.index.names = ["dt"]
-    df_ts_cluster_agg = df_ts_cluster.groupby(['dt']).agg({"gb": "sum"})
+    df_ts_cluster_agg = df_ts_cluster.groupby(["dt"]).agg({"gb": "sum"})
 
     return df_ts_cluster_agg
 

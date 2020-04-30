@@ -2,9 +2,11 @@
 This module contains functions related to the forecasting process
 
 The module contains the following functions:
-* forecast:
-* prepare_forecast:
-* make_forecast:
+* forecast: calls all functions related to forecasting
+* prepare_forecast: prepares the input time series of a cluster in a format
+                    necessary for forecasting
+* make_forecast: builds and fits the forecasting model and subsequently makes
+                 the forecast
 """
 import pandas as pd
 from .utils import *
@@ -22,15 +24,15 @@ def forecast(df_ts_cluster, dict_config):
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
     :return: the forecasted time series as well as original time series
-    :rtype: pandas DataFrame
+    :rtype: tuple (pandas DataFrame, fbprophet model)
     """
     # Prepare input data for forecast
     df_ts_prophet = prepare_forecast(df_ts_cluster)
 
     # Make forecast
-    df_fcst = make_forecast(df_ts_prophet, dict_config)
+    df_fcst, model = make_forecast(df_ts_prophet, dict_config)
 
-    return df_fcst
+    return df_fcst, model
 
 
 @dec_validation
@@ -68,27 +70,28 @@ def make_forecast(df_ts_prophet, dict_config):
     :type df_ts_prophet: pandas DataFrame
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
-    :return:
-    :rtype:
+    :return:  the original and forecasted time series of a cluster as well as
+              the corresponding fbporphet model
+    :rtype: tuple (pandas DataFrame, fbprophet model)
     """
-    # Build fbprophet model with most parameters set to be default
-    model_prophet = Prophet(seasonality_mode="multiplicative", yearly_seasonality=True,)
+    # Build fbprophet model with most parameters set as default
+    model = Prophet(seasonality_mode="multiplicative", yearly_seasonality=True,)
 
     # Use country-wide German holidays
-    model_prophet.add_country_holidays(country_name="DE")
+    model.add_country_holidays(country_name="DE")
 
     # Fit model
-    model_prophet.fit(df_ts_prophet)
+    model.fit(df_ts_prophet)
 
     # Construct future DataFrame with number of days to be predicted
-    df_future = model_prophet.make_future_dataframe(
+    df_future = model.make_future_dataframe(
         periods=dict_config["fcst_days"], freq="D"
     )
 
     # Make forecast
-    df_fcst_prophet = model_prophet.predict(df_future)
+    df_fcst_prophet = model.predict(df_future)
 
     # Add original values
     df_fcst_prophet["y"] = df_ts_prophet["y"]
 
-    return df_fcst_prophet
+    return df_fcst_prophet, model

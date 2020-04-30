@@ -2,25 +2,28 @@
 This module contains functions related to multiprocessing
 
 The module contains the following functions:
-* start_process:
-* get_number_processes:
-* get_cluster_chunks:
-* mp_run:
+* start_process: triggers all functions necessary for the forecasting workflow
+* get_number_processes: determines number of processes used for multi-processing
+* get_cluster_chunks: splits up a list of cluster IDs into n-disjoint chunks
+* mp_run: implementation of a single process
 """
 import concurrent.futures
-import multiprocessing as mp
 from functools import partial
 from .preprocessing import *
 from .forecasting import *
 from .data import *
 
 
-MAX_PROCESSES = 32
-
-
 @dec_validation
 @dec_logger
-def start_process(df_traffic, dict_so_cluster, dict_config):
+def start_process(
+    df_traffic,
+    dict_so_cluster,
+    dict_config,
+    max_processes=32,
+    dir_plot="../data/fcst_images",
+    dir_logs="../logs",
+):
     """ Initialize the worker processes for pre-processing and forecasting
 
     :param df_traffic: DataFrame with traffic related data and DateTimeIndex
@@ -29,21 +32,30 @@ def start_process(df_traffic, dict_so_cluster, dict_config):
     :type dict_so_cluster: Dictionary
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
+    :param max_processes: upper bound for the number of process
+    :type max_processes: int
+    :param dir_plot: folder for plots of forecast results
+    :type dir_plot: str
     :return: the original and forecasted time series for every cluster
     :rtype pandas DataFrame
     """
     # Determine max number of processes to be initialized
-    n_processes = get_number_processes()
+    n_processes = get_number_processes(max_processes)
 
-    # Determine cluster IDs to be forecasted
+    # Determine cluster IDs to be forecasted and set ID -1 for total Germany
+    # Note: IDs are not consecutive numbers
     cluster_ids = list(set(val for val in dict_so_cluster.values()))
-    cluster_ids = cluster_ids[:2]
+    cluster_ids.append(-1)
+    # cluster_ids = cluster_ids[:8]
 
     # Create result DataFrame
     df_fcst_results = prepare_fcst_df()
 
+    # Create chunks with cluster ID
+    cluster_chunks = get_cluster_chunks(cluster_ids, n_processes)
+
     # Create a partial function to pass multiple arguments
-    func = partial(mp_run, df_traffic, dict_so_cluster, dict_config)
+    func = partial(mp_run, df_traffic, dict_so_cluster, dict_config, dir_plot, dir_logs)
 
     # Serial implementation
     # for cluster in cluster_ids:
@@ -52,11 +64,11 @@ def start_process(df_traffic, dict_so_cluster, dict_config):
     #     # Combine all individual forecast results to one DataFrame
     #     df_fcst_results = df_fcst_results.append(fcst_results)
 
-    # Use context manager for ProcessPoolExecutor and iterate over cluster_ids
+    # Use context manager for ProcessPoolExecutor and iterate over cluster chunks
     with concurrent.futures.ProcessPoolExecutor(max_workers=n_processes) as executor:
-        fcst_results = executor.map(func, cluster_ids)
+        fcst_results = executor.map(func, cluster_chunks)
 
-        # Combine all individual forecast results to one DataFrame
+        # Combine forecast results of all chunks to one DataFrame
         for fcst in fcst_results:
             df_fcst_results = df_fcst_results.append(fcst)
 
@@ -65,15 +77,17 @@ def start_process(df_traffic, dict_so_cluster, dict_config):
 
 @dec_validation
 @dec_logger
-def get_number_processes():
+def get_number_processes(max_processes):
     """ Calculate number of processes used for forecasting
 
+    :param max_processes: upper bound for the number of process
+    :type max_processes: int
     :return: number of processes used for forecasting
     :rtype: int
     """
     # Check number of CPU cores
-    if MAX_PROCESSES <= mp.cpu_count():
-        return MAX_PROCESSES
+    if max_processes <= mp.cpu_count():
+        return max_processes
 
     return mp.cpu_count()
 
@@ -81,7 +95,9 @@ def get_number_processes():
 @dec_validation
 @dec_logger
 def get_cluster_chunks(cluster_ids, n_processes):
-    """ Split list of cluster IDs in n_process-disjoint lists
+    """ Split list of cluster IDs in n_process-disjoint lists if  n_processes >
+    number of IDs, otherwise create only one chunk (note: other rules would be
+    possible in this case)
 
     :param cluster_ids: list of cluster IDs
     :type cluster_ids: list of ints
@@ -90,21 +106,27 @@ def get_cluster_chunks(cluster_ids, n_processes):
     :return: list with independent cluster ID chunks
     :rtype: list of lists of ints
     """
+    # Create only one process if n_processes > number IDs
+    if n_processes > len(cluster_ids):
+        return [cluster_ids]
+
     cluster_ids_section = []
     section_size = int(len(cluster_ids) / n_processes)
 
     # Split all cluster IDs in equally large chunks
     for i in range(n_processes):
         if i >= n_processes - 1:
-            section = cluster_ids[(i * section_size):]
+            section = cluster_ids[(i * section_size) :]
         else:
-            section = cluster_ids[(i * section_size):((i + 1) * section_size)]
+            section = cluster_ids[(i * section_size) : ((i + 1) * section_size)]
         cluster_ids_section.append(section)
 
     return cluster_ids_section
 
 
-def mp_run(df_traffic, dict_so_cluster, dict_config, clu_id):
+def mp_run(
+    df_traffic, dict_so_cluster, dict_config, dir_plot, dir_logs, cluster_chunks
+):
     """ Implementation of a single process / worker
 
     :param df_traffic: DataFrame with traffic related data and DateTimeIndex
@@ -113,24 +135,41 @@ def mp_run(df_traffic, dict_so_cluster, dict_config, clu_id):
     :type dict_so_cluster: Dictionary
     :param dict_config: Dictionary with config data
     :type dict_config: Dictionary
-    :param clu_id: cluster ID to be processed
-    :type clu_id: int
-    :return the original & forecasted time series for the cluster
+    :param dir_plot: folder for plots of forecast results
+    :type dir_plot: str
+    :param cluster_chunks: chunk of cluster IDs to be processed
+    :type cluster_chunks: list of ints
+    :return the original & forecasted time series for all clusters in the chunk
     :rtype pandas DataFrame
     """
 
     # Configure logger for each individual process and get process ID
-    logger = configure_logger()
+    logger = configure_logger(dir_logs=dir_logs)
 
-    # Run pre-processing
-    df_ts_cluster = preprocess_data(df_traffic, dict_so_cluster, clu_id)
+    # Create result DataFrame for cluster chunk
+    df_fcst_results = prepare_fcst_df()
 
-    # Run forecasting to get a DataFrame with forecasted time series
-    logger.info(f"> Start forecast cluster ID {clu_id}")
-    df_fcst = forecast(df_ts_cluster, dict_config)
-    logger.info(f"+ End forecast cluster ID: {clu_id}")
+    for clu_id in cluster_chunks:
+        # Run pre-processing
+        df_ts_cluster = preprocess_data(df_traffic, dict_so_cluster, clu_id)
 
-    # Add cluster identifier for the time series
-    df_fcst["cluster_id"] = clu_id
+        # Run forecasting to get a DataFrame with forecasted time series
+        logger.info(f"> Start forecast cluster ID {clu_id}")
+        df_fcst, model = forecast(df_ts_cluster, dict_config)
+        logger.info(f"+ End forecast cluster ID: {clu_id}")
 
-    return df_fcst[["ds", "cluster_id", "y", "yhat"]]
+        # Add cluster identifier for the time series
+        df_fcst["cluster_id"] = clu_id
+        df_fcst_results = df_fcst_results.append(
+            df_fcst[["ds", "cluster_id", "y", "yhat"]]
+        )
+
+        # Plot the forecasting result and save it
+        fp = os.path.join(dir_plot, f"fcst_cluster_{clu_id}.png")
+        model.plot(df_fcst).savefig(fp)
+
+        # Plot the forecasting components and save them
+        fp = os.path.join(dir_plot, f"components_cluster_{clu_id}.png")
+        model.plot_components(df_fcst).savefig(fp)
+
+    return df_fcst_results

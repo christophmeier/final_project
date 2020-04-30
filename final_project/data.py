@@ -22,8 +22,13 @@ def load_data(f_clustering="../data/clustering.csv", f_traffic="../data/traffic.
              DateTimeIndex containing data traffic information for a certain date
     :rtype tuple (dictionary, DataFrame)
     """
+    # Read site-to-cluster assignments
     dict_so_cluster = load_clustering(f_clustering)
+    assert dict_so_cluster is not None, "Import of clustering data is None."
+
+    # Read data traffic
     df_traffic = load_traffic(f_traffic)
+    assert df_traffic is not None, "Import of traffic data is None."
 
     return dict_so_cluster, df_traffic
 
@@ -41,11 +46,9 @@ def load_clustering(filename):
     :return dict_so_cluster: dictionary mapping site numbers to cluster IDs
     :rtype: dictionary
     """
-    # Check if file exists
-    if not os.path.exists(filename):
-        raise FileNotFoundError("File {} does not exist".format(filename))
     # Read raw data
     df_clustering = pd.read_csv(filename, sep=";")
+
     # Make dictionary out of site numbers and cluster IDs
     dict_so_cluster = pd.Series(
         df_clustering["cluster"].values, index=df_clustering["so_number"]
@@ -69,9 +72,6 @@ def load_traffic(filename, key="df"):
             a certain date
     :rtype: pandas DataFrame
     """
-    # Check if file exists
-    if not os.path.exists(filename):
-        raise FileNotFoundError("File {} does not exist".format(filename))
     # Read raw traffic data and return it as DataFrame
     return pd.read_hdf(filename, key)
 

@@ -24,8 +24,6 @@ parser.add_argument("-d", dest="n_days", type=int, default=365)
 
 
 def main():
-    #df_test = pd.read_hdf("forecast.h5", "df")
-
     # Get number of days to be forecasted
     # args = parser.parse_args()
     # fcst_days = args.n_days

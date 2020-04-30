@@ -6,6 +6,7 @@ The module contains the following functions:
 """
 import logging
 import multiprocessing as mp
+import os
 import sys
 
 
@@ -15,7 +16,6 @@ def dec_logger(func):
     :param func: function to be decorated
     :return: wrapper function
     """
-
     def wrapper_logger(*args, **kwargs):
         # Get logger and set level
         logger = mp.get_logger()
@@ -38,7 +38,6 @@ def dec_validation(func):
     :param func: function to be decorated
     :return: wrapper function
     """
-
     def wrapper_validation(*args, **kwargs):
         # Get logger and set level
         logger = mp.get_logger()
@@ -51,22 +50,21 @@ def dec_validation(func):
         except Exception as e:
             # Logging of exception and stop function
             logger.error("!! Exception occured: {}".format(e))
-            return
+            raise Exception
 
     return wrapper_validation
 
 
-def configure_logger():
+def configure_logger(dir_logs="../logs"):
     """ Creates and configures a logger using Python logging module.
 
     :return: a customized logger
     """
-    # Disable fbprophet logger
+    # Set level of fbprophet logger to ERROR
     logging.getLogger("fbprophet").setLevel(logging.ERROR)
     logging.getLogger("fbprophet").handlers = []
 
     # Create a custom logger
-    # mp.log_to_stderr()
     logger = mp.get_logger()
     logger.setLevel(logging.INFO)
 
@@ -81,9 +79,9 @@ def configure_logger():
     logger.addHandler(c_handler)
 
     # File output
-    f_handler = logging.FileHandler(
-        f"../logs/summary_[{mp.current_process().name}].log", mode="w"
-    )
+    fp = os.path.join(dir_logs, f"summary_[{mp.current_process().name}].log")
+    f_handler = logging.FileHandler(fp, mode="w")
+
     f_handler.setLevel(logging.INFO)
     f_format = logging.Formatter(
         fmt="[%(levelname)s/%(processName)s] %(asctime)s | %(message)s",
@@ -93,9 +91,8 @@ def configure_logger():
     logger.addHandler(f_handler)
 
     # File output in case of exceptions
-    f_handler_error = logging.FileHandler(
-        f"../logs/summary_error_[{mp.current_process().name}].log", mode="w"
-    )
+    fp = os.path.join(dir_logs, f"summary_error_[{mp.current_process().name}].log")
+    f_handler_error = logging.FileHandler(fp, mode="w")
     f_handler_error.setLevel(logging.ERROR)
     f_handler_error.setFormatter(f_format)
     logger.addHandler(f_handler_error)
