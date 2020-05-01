@@ -173,3 +173,42 @@ class ProcessTestCase(TestCase):
             # Check if plot exists
             fp_plot = os.path.join(tmp, f"fcst_cluster_{clusters[0]}.png")
             assert os.path.exists(fp_plot)
+
+
+class PreProcessingTestCase(TestCase):
+    def test_make_ts(self):
+        # Set-up
+        df_traffic = get_fake_timeseries()
+        dict_so_cluster = {"1": 1, "2": 2, "3": 3}
+        cluster_ids = [1, 2, 3, -1]
+
+        # Generate time series for a all clusters
+        for cluster_id in cluster_ids:
+            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id)
+            self.assertIsNotNone(df_ts)
+            self.assertEqual(df_ts.columns, ["gb"])
+            self.assertEqual(len(df_ts), 5)
+            self.assertEqual(df_ts.index.name, "dt")
+            self.assertTrue(df_ts.index.is_all_dates)
+
+    def test_make_clean_ts(self):
+        # Set-up
+        df_traffic = get_fake_timeseries()
+        dict_so_cluster = {"1": 1, "2": 2, "3": 3}
+        cluster_ids = [1, 2, 3, -1]
+
+        # Generate time series for a all clusters
+        for cluster_id in cluster_ids:
+            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id)
+            self.assertIsNotNone(df_ts)
+            self.assertEqual(df_ts.columns, ["gb"])
+            self.assertEqual(len(df_ts), 5)
+
+            # Put NaN values into time series for all rows
+            df_ts['gb'].iloc[:5] = np.NaN
+
+            # Make clean ts
+            df_ts_clean = make_clean_ts(df_ts)
+
+            # Check that time series does not contain any NaN value
+            self.assertFalse(df_ts_clean['gb'].isnull().any())

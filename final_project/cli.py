@@ -16,7 +16,6 @@ Why does this file exist, and why not put this in __main__?
 """
 import argparse
 import datetime
-import multiprocessing as mp
 from .process import *
 
 parser = argparse.ArgumentParser()
