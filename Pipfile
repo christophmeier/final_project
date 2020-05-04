@@ -18,6 +18,8 @@ pystan = "*"
 fbprophet = "*"
 tables = "*"
 plotly = "*"
+boto3 = "*"
+moto = "*"
 
 [requires]
 python_version = "3.7"

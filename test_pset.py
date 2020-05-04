@@ -1,8 +1,13 @@
 import math
 import numpy as np
-from tempfile import TemporaryDirectory
+from moto import mock_s3
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from unittest import TestCase
 from final_project.process import *
+
+AWS_ACCESS_KEY = "fake_access_key"
+AWS_SECRET_KEY = "fake_secret_key"
+AWS_REGION = "us-east-1"
 
 
 def get_clustering_content():
@@ -43,19 +48,72 @@ def get_fake_timeseries():
             "2019-01-04",
             "2019-01-05",
             "2019-01-01",
-            "2019-01-02",
-            "2019-01-03",
-            "2019-01-04",
-            "2019-01-05",
         ],
-        "so_number": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        "gb": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        "so_number": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3],
+        "gb": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3],
     }
     df_ts = pd.DataFrame(data=ts)
     df_ts["dt"] = pd.to_datetime(df_ts["dt"])
     df_ts.set_index("dt", inplace=True)
 
     return df_ts
+
+
+@mock_s3
+class AwsDownloadTest(TestCase):
+    def setUp(self):
+        f = NamedTemporaryFile(mode="wb", delete=False)
+        self.tempFileContents = b"I'm a temporary file for testing."
+        self.tempFilePath = f.name
+        f.write(self.tempFileContents)
+        f.close()
+        self.addCleanup(os.remove, self.tempFilePath)
+
+    def test_download_data_aws(self):
+        # Set-up a dictionary
+        dict_config = {
+            "f_clustering": "fake_clustering.csv",
+            "f_traffic": "fake_traffic_small.h5",
+            "aws_bucket": "cmeier-csci-e-29",
+            "dir_bucket": "final_project",
+        }
+
+        # Create S3 client
+        client = boto3.client(
+            "s3",
+            region_name=AWS_REGION,
+            aws_access_key_id=AWS_ACCESS_KEY,
+            aws_secret_access_key=AWS_SECRET_KEY,
+        )
+        # Create bucket
+        client.create_bucket(Bucket=dict_config["aws_bucket"])
+        # Upload fake file for clustering
+        client.upload_file(
+            self.tempFilePath,
+            dict_config["aws_bucket"],
+            f"{dict_config['dir_bucket']}/{dict_config['f_clustering']}",
+        )
+        # Upload fake file for traffic
+        client.upload_file(
+            self.tempFilePath,
+            dict_config["aws_bucket"],
+            f"{dict_config['dir_bucket']}/{dict_config['f_traffic']}",
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            dict_config["dir_local"] = tmpdir
+            fp_clustering = os.path.join(tmpdir, dict_config["f_clustering"])
+            fp_traffic = os.path.join(tmpdir, dict_config["f_traffic"])
+            download_data_aws(dict_config)
+
+            self.assertTrue(os.path.exists(fp_traffic))
+            self.assertTrue(os.path.exists(fp_clustering))
+            with open(fp_clustering, "r") as f:
+                content = f.read()
+            self.assertTrue(self.tempFileContents, content)
+            with open(fp_traffic, "r") as f:
+                content = f.read()
+            self.assertTrue(self.tempFileContents, content)
 
 
 class DataTestCase(TestCase):
@@ -72,8 +130,17 @@ class DataTestCase(TestCase):
 
     def test_load_data(self):
         with TemporaryDirectory() as tmp:
-            # Get fake clustering data
+            # Set test filepaths and dictionary
             fp_clustering = os.path.join(tmp, "test_clustering.csv")
+            fp_traffic = os.path.join(tmp, "test_traffic.h5")
+            dict_config = {
+                "f_clustering": fp_clustering,
+                "f_traffic": fp_traffic,
+                "dir_results_local": tmp,
+                "dir_local": tmp
+            }
+
+            # Get fake clustering data
             content = get_clustering_content()
             with open(fp_clustering, "w") as f:
                 f.write(content)
@@ -90,11 +157,10 @@ class DataTestCase(TestCase):
             self.assertTrue(math.isnan(df_export["yhat"].iloc[0]))
 
             # Export fake traffic file
-            fp_traffic = os.path.join(tmp, "test_traffic.h5")
-            export_fcst_results_hdf5(df_export, fp_traffic)
+            export_fcst_results_hdf5(df_export, dict_config, filename=fp_traffic)
 
             # Load clustering and traffic data
-            dict_test_so_cluster, df_test_traffic = load_data(fp_clustering, fp_traffic)
+            dict_test_so_cluster, df_test_traffic = load_data(dict_config)
             self.assertIsNotNone(dict_test_so_cluster)
             self.assertIsNotNone(df_test_traffic)
 
@@ -110,9 +176,14 @@ class DataTestCase(TestCase):
             self.assertEqual(df_test_traffic["y"].iloc[0], 0)
             self.assertEqual(df_test_traffic["yhat"].iloc[0], 0)
 
+    def test_config_data(self):
+        config = get_config_data()
+        self.assertIsNotNone(config)
+        self.assertGreater(len(config), 7)
+
 
 class ProcessTestCase(TestCase):
-    def test_get_number_prosses(self):
+    def test_get_number_processes(self):
         n_cpus = mp.cpu_count()
         max_processes = n_cpus + 1
         self.assertGreater(get_number_processes(1), 0)
@@ -146,29 +217,32 @@ class ProcessTestCase(TestCase):
         dict_so_cluster = {"1": 1, "2": 2, "3": 3}
         clusters = list(set(val for val in dict_so_cluster.values()))
         n_clusters = len(clusters)
-        dict_config = {"fcst_days": 1}
 
         with TemporaryDirectory() as tmp:
+            # Set dictionary
+            dict_config = {
+                "fcst_days": 1,
+                "dir_plot": tmp,
+                "dir_logs": tmp,
+            }
             # Run forecast for one process
             df_results = start_process(
                 df_traffic,
                 dict_so_cluster,
                 dict_config,
-                dir_plot=tmp,
-                dir_logs=tmp,
                 max_processes=1,
+                subset=False
             )
 
-            # Result DataFrame has one more cluster than input (due to cluster ID -1)
-            self.assertEqual(df_results["cluster_id"].nunique(), n_clusters + 1)
+            # Result DataFrame has only 3 clusters despite cluster ID -1 as
+            # cluster ID 3 should not be processed
+            self.assertEqual(df_results["cluster_id"].nunique(), n_clusters)
 
             # Check forecast results for clusters
             df_result = df_results[df_results["cluster_id"] == clusters[0]]
             self.assertEqual(df_result["yhat"].iloc[-1], 1)
             df_result = df_results[df_results["cluster_id"] == clusters[1]]
             self.assertEqual(df_result["yhat"].iloc[-1], 2)
-            df_result = df_results[df_results["cluster_id"] == clusters[2]]
-            self.assertEqual(df_result["yhat"].iloc[-1], 3)
 
             # Check if plot exists
             fp_plot = os.path.join(tmp, f"fcst_cluster_{clusters[0]}.png")
@@ -179,8 +253,8 @@ class PreProcessingTestCase(TestCase):
     def test_make_ts(self):
         # Set-up
         df_traffic = get_fake_timeseries()
-        dict_so_cluster = {"1": 1, "2": 2, "3": 3}
-        cluster_ids = [1, 2, 3, -1]
+        dict_so_cluster = {"1": 1, "2": 2}
+        cluster_ids = [1, 2, -1]
 
         # Generate time series for a all clusters
         for cluster_id in cluster_ids:
@@ -194,8 +268,8 @@ class PreProcessingTestCase(TestCase):
     def test_make_clean_ts(self):
         # Set-up
         df_traffic = get_fake_timeseries()
-        dict_so_cluster = {"1": 1, "2": 2, "3": 3}
-        cluster_ids = [1, 2, 3, -1]
+        dict_so_cluster = {"1": 1, "2": 2}
+        cluster_ids = [1, 2, -1]
 
         # Generate time series for a all clusters
         for cluster_id in cluster_ids:
@@ -205,10 +279,10 @@ class PreProcessingTestCase(TestCase):
             self.assertEqual(len(df_ts), 5)
 
             # Put NaN values into time series for all rows
-            df_ts['gb'].iloc[:5] = np.NaN
+            df_ts["gb"].iloc[:5] = np.NaN
 
             # Make clean ts
             df_ts_clean = make_clean_ts(df_ts)
 
             # Check that time series does not contain any NaN value
-            self.assertFalse(df_ts_clean['gb'].isnull().any())
+            self.assertFalse(df_ts_clean["gb"].isnull().any())

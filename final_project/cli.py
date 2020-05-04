@@ -23,29 +23,30 @@ parser.add_argument("-d", dest="n_days", type=int, default=365)
 
 
 def main():
-    # Get number of days to be forecasted
+    # Get number of days to be forecasted which is at least 0 days
     # args = parser.parse_args()
-    # fcst_days = args.n_days
-    fcst_days = 365
+    # fcst_days = max(args.n_days, 0)
 
-    # Create dictionary with respect to configuration data
-    dict_config = {'fcst_days': fcst_days}
+    # Get config data
+    dict_config = get_config_data()
+    dict_config['fcst_days'] = 365
 
     # Init time for program start
     t_start = datetime.datetime.now()
 
     # Create and configure logger
-    logger = configure_logger()
+    logger = configure_logger(dict_config)
     logger.info("Program start")
 
-    # Load clustering and traffic data
-    dict_so_cluster, df_traffic = load_data()
+    # Download data from AWS, import clustering and traffic data
+    download_data_aws(dict_config)
+    dict_so_cluster, df_traffic = load_data(dict_config)
 
     # Start worker processes
     df_fcst_results = start_process(df_traffic, dict_so_cluster, dict_config)
 
     # Export data
-    export_fcst_results_hdf5(df_fcst_results)
+    export_fcst_results_hdf5(df_fcst_results, dict_config)
 
     # Measure final time and display overall time
     t_end = datetime.datetime.now()
