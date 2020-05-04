@@ -14,8 +14,40 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
+import argparse
+import datetime
+from .process import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", dest="n_days", type=int, default=365)
 
 
 def main():
-    print("Hello world")
-    print("Hello world")
+    # Get number of days to be forecasted which is at least 0 days
+    # args = parser.parse_args()
+    # fcst_days = max(args.n_days, 0)
+
+    # Get config data
+    dict_config = get_config_data()
+    dict_config['fcst_days'] = 365
+
+    # Init time for program start
+    t_start = datetime.datetime.now()
+
+    # Create and configure logger
+    logger = configure_logger(dict_config)
+    logger.info("Program start")
+
+    # Download data from AWS, import clustering and traffic data
+    download_data_aws(dict_config)
+    dict_so_cluster, df_traffic = load_data(dict_config)
+
+    # Start worker processes
+    df_fcst_results = start_process(df_traffic, dict_so_cluster, dict_config)
+
+    # Export data
+    export_fcst_results_hdf5(df_fcst_results, dict_config)
+
+    # Measure final time and display overall time
+    t_end = datetime.datetime.now()
+    logger.info(f"Program end\nProgram duration: {(t_end - t_start)}")
