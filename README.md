@@ -42,14 +42,14 @@ number of forecast days (can be specified by the user). Due to the scope of this
 of the problem at many points and used an existing clustering (which comes from one of my former projects) of Germany in 
 roughly 1.400 regions. As output, the app will also generate plots for the time series and its components (trend, seasonality) 
 for a specific cluster: 
-![Image description](data/visualization_final.png)
+![Result visualiaztion](https://i.ibb.co/mHY1XJL/visualization-final.png)
 
 #### Workflow
 As the forecast of an individual cluster is independent of the forecast of other clusters, overall process time can be 
 reduced through concurrency. Using concurrency in Python is actually the main motivation of my work. For that purpose, 
 Python basically offers two options: multiprocessing and threading. As the task to be parallelized is more CPU bound, 
 multiprocessing is expected to be the best strategy. The overall process workflow looks as follows:
-![Image description](data/workflow.png)
+![Workflow](https://i.ibb.co/K0ZVRMv/workflow.png)
 
 #### Results
 I used the ProcessPoolExecutor / ThreadPoolExecutor classes in concurrent.futures and compared their times with a sequential 
