@@ -19,17 +19,16 @@ import datetime
 from .process import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", dest="n_days", type=int, default=365)
+parser.add_argument("-d", dest="fcst_days", type=int, default=365)
 
 
 def main():
     # Get number of days to be forecasted which is at least 0 days
-    # args = parser.parse_args()
-    # fcst_days = max(args.n_days, 0)
+    args = parser.parse_args()
 
     # Get config data
     dict_config = get_config_data()
-    dict_config['fcst_days'] = 365
+    dict_config["fcst_days"] = max(args.fcst_days, 0)
 
     # Init time for program start
     t_start = datetime.datetime.now()
@@ -49,5 +48,4 @@ def main():
     export_fcst_results_hdf5(df_fcst_results, dict_config)
 
     # Measure final time and display overall time
-    t_end = datetime.datetime.now()
-    logger.info(f"Program end\nProgram duration: {(t_end - t_start)}")
+    logger.info(f"Program end\nProgram duration: {(datetime.datetime.now() - t_start)}")
