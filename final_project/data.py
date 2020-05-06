@@ -8,6 +8,7 @@ The module contains the following functions:
 * load_traffic: loads data traffic info from hdf file to pandas DataFrame
 * export_fcst_results_hdf5: exports a DataFrame as hdf file
 * prepare_fcst_df: creates a DataFrame in the format necessary for export
+* get_config_data: returns configuration data for the app
 """
 import boto3
 import pandas as pd
@@ -164,6 +165,8 @@ def get_config_data():
         "dir_results_local": "./data/fcst_results",
         "dir_plot": "./data/fcst_images",
         "dir_logs": "./logs",
+        "ts_input_start": "2017-07-01",
+        "ts_input_end": "2019-12-31",
     }
 
     return dict_config

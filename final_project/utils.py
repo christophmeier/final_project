@@ -1,8 +1,9 @@
 """ This module contains utility functions for final project
 
 The module contains the following functions:
-* dec_logger - decorator for logging
-* dec_validation - decorator for error handling
+* dec_logger: decorator for logging
+* dec_validation: decorator for error handling
+* configure_logger: creates and configures a custom logger
 """
 import logging
 import multiprocessing as mp

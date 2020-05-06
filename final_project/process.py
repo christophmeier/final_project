@@ -107,9 +107,9 @@ def get_cluster_chunks(cluster_ids, n_processes):
     # Split all cluster IDs in equally large chunks
     for i in range(n_processes):
         if i >= n_processes - 1:
-            section = cluster_ids[(i * section_size):]
+            section = cluster_ids[(i * section_size) :]
         else:
-            section = cluster_ids[(i * section_size): ((i + 1) * section_size)]
+            section = cluster_ids[(i * section_size) : ((i + 1) * section_size)]
         cluster_ids_section.append(section)
 
     return cluster_ids_section
@@ -139,7 +139,9 @@ def mp_run(df_traffic, dict_so_cluster, dict_config, cluster_chunk):
     # Iterate over all cluster IDs in chunk
     for clu_id in cluster_chunk:
         # Run pre-processing
-        df_ts_cluster = preprocess_data(df_traffic, dict_so_cluster, clu_id)
+        df_ts_cluster = preprocess_data(
+            df_traffic, dict_so_cluster, clu_id, dict_config
+        )
 
         # Note: a cluster time series must have at least 2 NaN rows. This is a
         # constraint of fbprophet

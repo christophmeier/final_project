@@ -12,24 +12,22 @@ The module contains the following functions:
 from .utils import *
 
 
-TS_START = "2017-07-01"
-TS_END = "2019-12-31"
-
-
 @dec_validation
 @dec_logger
-def preprocess_data(df_traffic, dict_so_cluster, cluster_id):
+def preprocess_data(df_traffic, dict_so_cluster, cluster_id, dict_config):
     """ Pre-processes all input data before forecasting, e.g. time series
     generation, data cleaning and data imputation
 
     :param df_traffic: DataFrame with traffic related data and DateTimeIndex
     :param dict_so_cluster: dictionary mapping site numbers to cluster IDs
     :param cluster_id: a specific cluster ID
+    :param dict_config: config data
+    :type dict_config: Dictionary
     :return: a cleaned time series for the cluster
     :rtype: pandas DataFrame
     """
     # Create time series for cluster
-    df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id)
+    df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id, dict_config)
 
     # Clean time series
     df_ts_clean = make_clean_ts(df_ts)
@@ -39,7 +37,7 @@ def preprocess_data(df_traffic, dict_so_cluster, cluster_id):
 
 @dec_validation
 @dec_logger
-def make_ts(df_traffic, dict_so_cluster, cluster_id):
+def make_ts(df_traffic, dict_so_cluster, cluster_id, dict_config):
     """ Makes a time series as pandas DataFrame for a certain cluster assuming
     traffic input data for all clusters
 
@@ -49,6 +47,8 @@ def make_ts(df_traffic, dict_so_cluster, cluster_id):
     :type dict_so_cluster: Dictionary
     :param cluster_id: a specific cluster ID
     :type cluster_id: int
+    :param dict_config: config data
+    :type dict_config: Dictionary
     :return: a DataFrame with daily data traffic for the cluster
     :rtype pandas DataFrame with DateTimeIndex and one column
     """
@@ -66,7 +66,9 @@ def make_ts(df_traffic, dict_so_cluster, cluster_id):
     df_ts_cluster = df_traffic.loc[df_traffic["so_number"].isin(so_cluster)]
 
     # Consider only dates within specified period
-    df_ts_cluster = df_ts_cluster.loc[TS_START:TS_END]
+    df_ts_cluster = df_ts_cluster.loc[
+        dict_config["ts_input_start"] : dict_config["ts_input_end"]
+    ]
 
     # Rename index and aggregate traffic data on cluster level by date / index
     df_ts_cluster.index.names = ["dt"]

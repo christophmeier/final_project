@@ -137,7 +137,7 @@ class DataTestCase(TestCase):
                 "f_clustering": fp_clustering,
                 "f_traffic": fp_traffic,
                 "dir_results_local": tmp,
-                "dir_local": tmp
+                "dir_local": tmp,
             }
 
             # Get fake clustering data
@@ -179,7 +179,7 @@ class DataTestCase(TestCase):
     def test_config_data(self):
         config = get_config_data()
         self.assertIsNotNone(config)
-        self.assertGreater(len(config), 7)
+        self.assertGreater(len(config), 9)
 
 
 class ProcessTestCase(TestCase):
@@ -224,14 +224,12 @@ class ProcessTestCase(TestCase):
                 "fcst_days": 1,
                 "dir_plot": tmp,
                 "dir_logs": tmp,
+                "ts_input_start": "2019-01-01",
+                "ts_input_end": "2019-01-05",
             }
             # Run forecast for one process
             df_results = start_process(
-                df_traffic,
-                dict_so_cluster,
-                dict_config,
-                max_processes=1,
-                subset=False
+                df_traffic, dict_so_cluster, dict_config, max_processes=1, subset=False
             )
 
             # Result DataFrame has only 3 clusters despite cluster ID -1 as
@@ -255,10 +253,11 @@ class PreProcessingTestCase(TestCase):
         df_traffic = get_fake_timeseries()
         dict_so_cluster = {"1": 1, "2": 2}
         cluster_ids = [1, 2, -1]
+        dict_config = {"ts_input_start": "2019-01-01", "ts_input_end": "2019-01-05"}
 
         # Generate time series for a all clusters
         for cluster_id in cluster_ids:
-            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id)
+            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id, dict_config)
             self.assertIsNotNone(df_ts)
             self.assertEqual(df_ts.columns, ["gb"])
             self.assertEqual(len(df_ts), 5)
@@ -269,11 +268,12 @@ class PreProcessingTestCase(TestCase):
         # Set-up
         df_traffic = get_fake_timeseries()
         dict_so_cluster = {"1": 1, "2": 2}
+        dict_config = {"ts_input_start": "2019-01-01", "ts_input_end": "2019-01-05"}
         cluster_ids = [1, 2, -1]
 
         # Generate time series for a all clusters
         for cluster_id in cluster_ids:
-            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id)
+            df_ts = make_ts(df_traffic, dict_so_cluster, cluster_id, dict_config)
             self.assertIsNotNone(df_ts)
             self.assertEqual(df_ts.columns, ["gb"])
             self.assertEqual(len(df_ts), 5)
