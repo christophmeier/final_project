@@ -9,6 +9,7 @@ import logging
 import multiprocessing as mp
 import os
 import sys
+from functools import wraps
 
 
 def dec_logger(func):
@@ -17,7 +18,7 @@ def dec_logger(func):
     :param func: function to be decorated
     :return: wrapper function
     """
-
+    @wraps(func)
     def wrapper_logger(*args, **kwargs):
         # Get logger and set level
         logger = mp.get_logger()
@@ -40,7 +41,7 @@ def dec_validation(func):
     :param func: function to be decorated
     :return: wrapper function
     """
-
+    @wraps(func)
     def wrapper_validation(*args, **kwargs):
         # Get logger and set level
         logger = mp.get_logger()
